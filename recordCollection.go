@@ -14,7 +14,7 @@ type (
 	recordCollection []cloudflare.DNSRecord
 )
 
-// Find will serach for needle in a recordCollection.
+// Find will search for needle in a recordCollection.
 func (c recordCollection) Find(needle cloudflare.DNSRecord) (int, *cloudflare.DNSRecord) {
 	for i, r := range c {
 		if match(r, needle) {
