@@ -102,7 +102,10 @@ func parseZone(r io.Reader) (string, recordCollection, error) {
 }
 
 // newRecord will instantiate a new cloudflare-compatible DNS record based on
-// a token from our zone file parser.
+// a token from miekg/dns..
+// If the TTL has a value of 1 Proxied will be set to true in the resulting
+// DNSRecord mimicking Cloudflare internal TTL's.
+// A TTL of 0 will result in "automatic" TTL.
 func newRecord(in *dns.Token) *cloudflare.DNSRecord {
 	record := &cloudflare.DNSRecord{
 		Name: strings.Trim(in.Header().Name, "."),
