@@ -241,6 +241,49 @@ test4 1 IN A 127.0.0.4
 	}
 }
 
+func TestParseZoneFail(t *testing.T) {
+	cases := []string{`$ORIGIN example.com.
+
+@    86400    IN SOA ns1.example.com. hostmaster.example.com. (
+          2015071700
+          86400
+          7200
+          604800
+          86400
+)
+test1 1800 IN A 127.0.0.1
+loc1 IN LOC 57 2 59.173 N 9 56 42.07 E 0m 10m 100m 10m
+`, `@    86400    IN SOA ns1.example.com. hostmaster.example.com. (
+	  2015071700
+	  86400
+	  7200
+	  604800
+	  86400
+)
+test2 1800 IN A 127.0.0.2
+`,
+	}
+
+	for i, in := range cases {
+		r := strings.NewReader(in)
+		zoneName, records, err := parseZone(r)
+
+		if zoneName != "" {
+			t.Errorf("%d parseZone() returned a zonename for a broken zone: %s", i, zoneName)
+		}
+
+		if len(records) > 0 {
+			t.Errorf("%d: parseZone() returned record for a broken zone", i)
+		}
+
+		if err == nil {
+			t.Errorf("%d: parseZone() failed to err on broken zone", i)
+		}
+
+		parseZone(r)
+	}
+}
+
 func zoneString(c recordCollection) string {
 	var b bytes.Buffer
 

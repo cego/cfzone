@@ -88,7 +88,11 @@ func parseZone(r io.Reader) (string, recordCollection, error) {
 			zoneName = strings.Trim(soa.Header().Name, ".")
 		}
 
-		r := newRecord(t)
+		r, err := newRecord(t)
+		if err != nil {
+			return "", recordCollection{}, err
+		}
+
 		if r != nil {
 			records = append(records, *r)
 		}
@@ -106,7 +110,7 @@ func parseZone(r io.Reader) (string, recordCollection, error) {
 // If the TTL has a value of 1 Proxied will be set to true in the resulting
 // DNSRecord mimicking Cloudflare internal TTL's.
 // A TTL of 0 will result in "automatic" TTL.
-func newRecord(in *dns.Token) *cloudflare.DNSRecord {
+func newRecord(in *dns.Token) (*cloudflare.DNSRecord, error) {
 	record := &cloudflare.DNSRecord{
 		Name: strings.Trim(in.Header().Name, "."),
 		TTL:  int(in.Header().Ttl),
@@ -121,13 +125,13 @@ func newRecord(in *dns.Token) *cloudflare.DNSRecord {
 		a := in.RR.(*dns.A)
 		record.Content = a.A.String()
 		record.Type = "A"
-		return record
+		return record, nil
 
 	case *dns.AAAA:
 		a := in.RR.(*dns.AAAA)
 		record.Content = a.AAAA.String()
 		record.Type = "AAAA"
-		return record
+		return record, nil
 
 	case *dns.CNAME:
 		cname := in.RR.(*dns.CNAME)
@@ -138,32 +142,30 @@ func newRecord(in *dns.Token) *cloudflare.DNSRecord {
 		if strings.HasSuffix(record.Content, ".") {
 			record.Content = record.Content[:len(record.Content)-1]
 		}
-		return record
+		return record, nil
 
 	case *dns.MX:
 		mx := in.RR.(*dns.MX)
 		record.Content = strings.Trim(mx.Mx, ".")
 		record.Priority = int(mx.Preference)
 		record.Type = "MX"
-		return record
+		return record, nil
 
-	// We ignore these for now.
-	case *dns.LOC:
-	case *dns.SRV:
-	case *dns.SPF:
 	case *dns.TXT:
 		txt := in.RR.(*dns.TXT)
 		if len(txt.Txt) > 0 {
 			record.Content = txt.Txt[0]
 		}
 		record.Type = "TXT"
-		return record
+		return record, nil
 
-	case *dns.NS:
-	case *dns.CAA:
+	case *dns.NS, *dns.SOA:
+		// We silently ignore NS and SOA because Cloudflare does not allow
+		// the user to change nameservers and SOA doesn't make sense.
+		return nil, nil
 	}
 
-	return nil
+	return nil, fmt.Errorf("Record type %T is not supported", in.RR)
 }
 
 // match will do matching between two DNS records while ignoring CF specific
