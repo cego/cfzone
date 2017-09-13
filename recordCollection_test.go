@@ -122,7 +122,7 @@ func TestDiff(t *testing.T) {
 	}
 }
 
-func TestPrint(t *testing.T) {
+func TestFprint(t *testing.T) {
 	c := recordCollection{
 		cloudflare.DNSRecord{Name: "a1", TTL: 0, Type: "A", Content: "127.0.0.1"},
 		cloudflare.DNSRecord{Name: "a2", TTL: 1, Type: "A", Content: "127.0.0.2", Proxied: true},
@@ -136,7 +136,7 @@ aaaa1. 0 IN AAAA  ::1
 	var b bytes.Buffer
 	w := bufio.NewWriter(&b)
 
-	c.Print(w)
+	c.Fprint(w)
 	w.Flush()
 
 	if b.String() != expected {
@@ -245,7 +245,7 @@ func zoneString(c recordCollection) string {
 	var b bytes.Buffer
 
 	w := bufio.NewWriter(&b)
-	c.Print(w)
+	c.Fprint(w)
 	w.Flush()
 
 	return b.String()

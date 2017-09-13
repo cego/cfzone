@@ -73,13 +73,13 @@ func main() {
 	if numChanges > 0 {
 		if len(deletes) > 0 {
 			fmt.Fprintf(stdout, "Records to delete:\n")
-			deletes.Print(stdout)
+			deletes.Fprint(stdout)
 			fmt.Printf("\n")
 		}
 
 		if len(adds) > 0 {
 			fmt.Fprintf(stdout, "Records to add:\n")
-			adds.Print(stdout)
+			adds.Fprint(stdout)
 			fmt.Printf("\n")
 		}
 

@@ -49,7 +49,9 @@ func (c recordCollection) Diff(remote recordCollection) (recordCollection, recor
 	return localOnly, remoteOnly
 }
 
-func (c recordCollection) Print(w io.Writer) {
+// Fprint will output a textual representation of a recordCollection resembling
+// the BIND zone file format.
+func (c recordCollection) Fprint(w io.Writer) {
 	maxName := 0
 	for _, r := range c {
 		if len(r.Name) > maxName {
