@@ -128,8 +128,8 @@ func TestPrint(t *testing.T) {
 		cloudflare.DNSRecord{Name: "a2", TTL: 1, Type: "A", Content: "127.0.0.2", Proxied: true},
 		cloudflare.DNSRecord{Name: "aaaa1", TTL: 0, Type: "AAAA", Content: "::1"},
 	}
-	expected := `a1   . 0 IN A     127.0.0.1
-a2   . 1 IN A     127.0.0.2 ; PROXIED
+	expected := `a1.    0 IN A     127.0.0.1
+a2.    1 IN A     127.0.0.2 ; PROXIED
 aaaa1. 0 IN AAAA  ::1
 `
 
