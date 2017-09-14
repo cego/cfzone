@@ -18,6 +18,8 @@ var (
 	stdin  = io.Reader(os.Stdin)
 	stderr = io.Writer(os.Stderr)
 
+	// yes can be set to true to disable the confirmation dialog and sync
+	// without asking the user. Will be set to true by the "-yes" flag.
 	yes = false
 )
 
