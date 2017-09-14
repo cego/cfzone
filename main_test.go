@@ -35,8 +35,26 @@ func expectExit(t *testing.T, code int) {
 func TestBrokenFlag(t *testing.T) {
 	defer expectExit(t, 1)
 
-	os.Args = []string{"./test", "-broken"}
-	main()
+	parseArguments([]string{"./test", "-broken"})
+}
+
+func TestParseArguments(t *testing.T) {
+	cases := []struct {
+		in       []string
+		expected string
+	}{
+		{[]string{"./test", "-yes", "path1"}, "path1"},
+		{[]string{"./test", "path2"}, "path2"},
+		{[]string{"./test", "path3", "-yes"}, "path3"},
+	}
+
+	for i, c := range cases {
+		result := parseArguments(c.in)
+
+		if result != c.expected {
+			t.Errorf("%d: parseArguments() did not return expected path for %+v. Got %s, expected %s", i, c.in, result, c.expected)
+		}
+	}
 }
 
 func TestMissingKey(t *testing.T) {
@@ -52,11 +70,7 @@ func TestMissingKey(t *testing.T) {
 func TestMissingArgument(t *testing.T) {
 	defer expectExit(t, 1)
 
-	apiKey = "nonempty"
-	apiEmail = "nonempty"
-
-	os.Args = []string{"./test"}
-	main()
+	parseArguments([]string{"./test"})
 }
 
 func TestNonexisting(t *testing.T) {
