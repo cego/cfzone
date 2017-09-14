@@ -32,12 +32,20 @@ func expectExit(t *testing.T, code int) {
 	}
 }
 
+func TestBrokenFlag(t *testing.T) {
+	defer expectExit(t, 1)
+
+	os.Args = []string{"./test", "-broken"}
+	main()
+}
+
 func TestMissingKey(t *testing.T) {
 	defer expectExit(t, 1)
 
 	apiKey = ""
 	apiEmail = ""
 
+	os.Args = []string{"./test", "zone"}
 	main()
 }
 

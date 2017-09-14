@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -16,6 +17,8 @@ var (
 	stdout = io.Writer(os.Stdout)
 	stdin  = io.Reader(os.Stdin)
 	stderr = io.Writer(os.Stderr)
+
+	yes = false
 )
 
 var (
@@ -24,12 +27,22 @@ var (
 )
 
 func main() {
-	if len(os.Args) < 2 {
+	// We do our own flagset to be able to test arguments.
+	flagset := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	flagset.SetOutput(stderr)
+	flagset.BoolVar(&yes, "yes", false, "Don't ask before syncing")
+	err := flagset.Parse(os.Args[1:])
+	if err != nil {
+		flagset.PrintDefaults()
+		exit(1)
+	}
+
+	if flagset.NArg() < 1 {
 		fmt.Fprintf(stderr, "Too few arguments\n")
 		exit(1)
 	}
 
-	path := os.Args[1]
+	path := flagset.Arg(0)
 
 	if apiKey == "" || apiEmail == "" {
 		fmt.Fprintf(stderr, "Please set CF_API_KEY and CF_API_EMAIL environment variables\n")
@@ -70,7 +83,7 @@ func main() {
 
 	numChanges := len(adds) + len(deletes)
 
-	if numChanges > 0 {
+	if numChanges > 0 && !yes {
 		if len(deletes) > 0 {
 			fmt.Fprintf(stdout, "Records to delete:\n")
 			deletes.Fprint(stdout)
