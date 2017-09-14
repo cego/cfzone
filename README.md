@@ -29,6 +29,7 @@ cfzone need two environment variables:
 - `CF_API_KEY` - Your API key from [Cloudflare](https://support.cloudflare.com/hc/en-us/articles/200167836-Where-do-I-find-my-Cloudflare-API-key-)
 - `CF_API_EMAIL` - Your Cloudflare email address.
 
+An optional `-yes` flag will cause cfzone to continue syncing without confirmation.
 
 ## Building
 

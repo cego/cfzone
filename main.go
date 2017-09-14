@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -16,6 +17,10 @@ var (
 	stdout = io.Writer(os.Stdout)
 	stdin  = io.Reader(os.Stdin)
 	stderr = io.Writer(os.Stderr)
+
+	// yes can be set to true to disable the confirmation dialog and sync
+	// without asking the user. Will be set to true by the "-yes" flag.
+	yes = false
 )
 
 var (
@@ -23,13 +28,30 @@ var (
 	apiEmail = os.Getenv("CF_API_EMAIL")
 )
 
-func main() {
-	if len(os.Args) < 2 {
+// parseArguments tries to pass the arguments in args. For most uses it would
+// make sense to simple pass os.Args. The function will call exit(1) on any
+// error. It will return the first ńon-flag argument.
+func parseArguments(args []string) string {
+	// We do our own flagset to be able to test arguments.
+	flagset := flag.NewFlagSet(args[0], flag.ContinueOnError)
+	flagset.SetOutput(stderr)
+	flagset.BoolVar(&yes, "yes", false, "Don't ask before syncing")
+	err := flagset.Parse(args[1:])
+	if err != nil {
+		flagset.PrintDefaults()
+		exit(1)
+	}
+
+	if flagset.NArg() < 1 {
 		fmt.Fprintf(stderr, "Too few arguments\n")
 		exit(1)
 	}
 
-	path := os.Args[1]
+	return flagset.Arg(0)
+}
+
+func main() {
+	path := parseArguments(os.Args)
 
 	if apiKey == "" || apiEmail == "" {
 		fmt.Fprintf(stderr, "Please set CF_API_KEY and CF_API_EMAIL environment variables\n")
@@ -70,7 +92,7 @@ func main() {
 
 	numChanges := len(adds) + len(deletes)
 
-	if numChanges > 0 {
+	if numChanges > 0 && !yes {
 		if len(deletes) > 0 {
 			fmt.Fprintf(stdout, "Records to delete:\n")
 			deletes.Fprint(stdout)
