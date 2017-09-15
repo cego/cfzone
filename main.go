@@ -64,7 +64,7 @@ func main() {
 		exit(1)
 	}
 
-	zoneName, localRecords, err := parseZone(f)
+	zoneName, fileRecords, err := parseZone(f)
 	if err != nil {
 		fmt.Fprintf(stderr, "Error reading '%s': %s\n", path, err.Error())
 		exit(1)
@@ -89,21 +89,21 @@ func main() {
 	}
 
 	// Cast the records from Cloudflare to a recordCollection.
-	remote := recordCollection(records)
+	existingRecords := recordCollection(records)
 
 	// Find records only present at cloudflare - and records only present in
 	// the local zone. This will be the basis for the add/delete collections.
-	onlyLocal := localRecords.Difference(remote, FullMatch)
-	onlyRemote := remote.Difference(localRecords, FullMatch)
+	addCandidates := fileRecords.Difference(existingRecords, FullMatch)
+	deleteCandidates := existingRecords.Difference(fileRecords, FullMatch)
 
 	// If we find the intersection between local and remote, we should have a
 	// list of records to update. We use only BasicMatch here, because that
 	// will give us a collection of records that makes sense to update.
-	updates := onlyRemote.Intersect(onlyLocal, BasicMatch)
+	updates := deleteCandidates.Intersect(addCandidates, BasicMatch)
 
 	// The changed records can be removed from the add and delete slices.
-	adds := onlyLocal.Difference(updates, BasicMatch)
-	deletes := onlyRemote.Difference(updates, BasicMatch)
+	adds := addCandidates.Difference(updates, BasicMatch)
+	deletes := deleteCandidates.Difference(updates, BasicMatch)
 
 	numChanges := len(updates) + len(adds) + len(deletes)
 
@@ -130,7 +130,7 @@ func main() {
 		fmt.Fprintf(stdout, "Records to delete: %d\n", len(deletes))
 		fmt.Fprintf(stdout, "Records to add: %d\n", len(adds))
 		fmt.Fprintf(stdout, "Records to update: %d\n", len(updates))
-		fmt.Fprintf(stdout, "Unchanged records: %d\n", len(records)-len(onlyRemote))
+		fmt.Fprintf(stdout, "Unchanged records: %d\n", len(records)-len(deleteCandidates))
 		fmt.Fprintf(stdout, "%d change(s). Continue (y/N)? ", numChanges)
 
 		if !yesNo(stdin) {
