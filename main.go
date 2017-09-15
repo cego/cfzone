@@ -97,13 +97,13 @@ func main() {
 	deleteCandidates := existingRecords.Difference(fileRecords, FullMatch)
 
 	// If we find the intersection between local and remote, we should have a
-	// list of records to update. We use only BasicMatch here, because that
+	// list of records to update. We use only Updatable here, because that
 	// will give us a collection of records that makes sense to update.
-	updates := deleteCandidates.Intersect(addCandidates, BasicMatch)
+	updates := deleteCandidates.Intersect(addCandidates, Updatable)
 
 	// The changed records can be removed from the add and delete slices.
-	adds := addCandidates.Difference(updates, BasicMatch)
-	deletes := deleteCandidates.Difference(updates, BasicMatch)
+	adds := addCandidates.Difference(updates, Updatable)
+	deletes := deleteCandidates.Difference(updates, Updatable)
 
 	numChanges := len(updates) + len(adds) + len(deletes)
 

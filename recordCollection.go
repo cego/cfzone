@@ -246,8 +246,9 @@ func FullMatch(a cloudflare.DNSRecord, b cloudflare.DNSRecord) bool {
 	return false
 }
 
-// BasicMatch will return true if record type and name matches.
-func BasicMatch(a cloudflare.DNSRecord, b cloudflare.DNSRecord) bool {
+// Updatable will return true if it makes sense to update (instead of
+// add/delete) from a to b or b to a.
+func Updatable(a cloudflare.DNSRecord, b cloudflare.DNSRecord) bool {
 	if a.Type != b.Type {
 		return false
 	}

@@ -101,7 +101,7 @@ func TestFullMatch(t *testing.T) {
 	}
 }
 
-func TestBasicMatch(t *testing.T) {
+func TestUpdatable(t *testing.T) {
 	cases := []struct {
 		a        cloudflare.DNSRecord
 		b        cloudflare.DNSRecord
@@ -119,7 +119,7 @@ func TestBasicMatch(t *testing.T) {
 	}
 
 	for i, in := range cases {
-		result := BasicMatch(in.a, in.b)
+		result := Updatable(in.a, in.b)
 
 		if result != in.expected {
 			t.Errorf("%d: match() Returned unexpected result for %v, %v: %v (expected %v)", i, in.a, in.b, result, in.expected)
