@@ -87,8 +87,6 @@ func main() {
 		fmt.Fprintf(stderr, "Can't get zone records for '%s': %s\n", id, err.Error())
 		exit(1)
 	}
-
-	// Cast the records from Cloudflare to a recordCollection.
 	existingRecords := recordCollection(records)
 
 	// Find records only present at cloudflare - and records only present in
