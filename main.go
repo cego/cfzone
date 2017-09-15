@@ -99,7 +99,8 @@ func main() {
 	// will give us a collection of records that makes sense to update.
 	updates := deleteCandidates.Intersect(addCandidates, Updatable)
 
-	// The changed records can be removed from the add and delete slices.
+	// The records to be updated can be removed from the add and delete
+	// collections.
 	adds := addCandidates.Difference(updates, Updatable)
 	deletes := deleteCandidates.Difference(updates, Updatable)
 
