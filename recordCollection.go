@@ -64,6 +64,8 @@ func (c recordCollection) Difference(remote recordCollection, match FilterFunc) 
 // Intersect will find the intersection between c and remote [c ∩ remote] with
 // the caveat that the ID from c will be used in the result - while all other
 // properties will be copied from remote.
+// If multiple record from a collection matches, only one will be present in
+// the returned collection.
 func (c recordCollection) Intersect(remote recordCollection, match FilterFunc) recordCollection {
 	// Clone the inputs - we do this to be able to remove from these
 	// collections when a match is found.
