@@ -90,12 +90,12 @@ func main() {
 	existingRecords := recordCollection(records)
 
 	// Find records only present at cloudflare - and records only present in
-	// the local zone. This will be the basis for the add/delete collections.
+	// the file zone. This will be the basis for the add/delete collections.
 	addCandidates := fileRecords.Difference(existingRecords, FullMatch)
 	deleteCandidates := existingRecords.Difference(fileRecords, FullMatch)
 
-	// If we find the intersection between local and remote, we should have a
-	// list of records to update. We use only Updatable here, because that
+	// If we find the intersection between file and existing, we should have
+	// a list of records to update. We use only Updatable here, because that
 	// will give us a collection of records that makes sense to update.
 	updates := deleteCandidates.Intersect(addCandidates, Updatable)
 
