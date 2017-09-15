@@ -88,9 +88,24 @@ func main() {
 		exit(1)
 	}
 
-	adds, deletes := localRecords.Diff(records)
+	// Cast the records from Cloudflare to a recordCollection.
+	remote := recordCollection(records)
 
-	numChanges := len(adds) + len(deletes)
+	// Find records only present at cloudflare - and records only present in
+	// the local zone. This will be the basis for the add/delete collections.
+	onlyLocal := localRecords.Difference(remote, FullMatch)
+	onlyRemote := remote.Difference(localRecords, FullMatch)
+
+	// If we find the intersection between local and remote, we should have a
+	// list of records to update. We use only BasicMatch here, because that
+	// will give us a collection of records that makes sense to update.
+	updates := onlyRemote.Intersect(onlyLocal, BasicMatch)
+
+	// The changed records can be removed from the add and delete slices.
+	adds := onlyLocal.Difference(updates, BasicMatch)
+	deletes := onlyRemote.Difference(updates, BasicMatch)
+
+	numChanges := len(updates) + len(adds) + len(deletes)
 
 	if numChanges > 0 && !yes {
 		if len(deletes) > 0 {
@@ -105,10 +120,17 @@ func main() {
 			fmt.Printf("\n")
 		}
 
+		if len(updates) > 0 {
+			fmt.Fprintf(stdout, "Records to update:\n")
+			updates.Fprint(stdout)
+			fmt.Printf("\n")
+		}
+
 		fmt.Fprintf(stdout, "Summary:\n")
 		fmt.Fprintf(stdout, "Records to delete: %d\n", len(deletes))
 		fmt.Fprintf(stdout, "Records to add: %d\n", len(adds))
-		fmt.Fprintf(stdout, "Unchanged records: %d\n", len(records)-len(deletes))
+		fmt.Fprintf(stdout, "Records to update: %d\n", len(updates))
+		fmt.Fprintf(stdout, "Unchanged records: %d\n", len(records)-len(onlyRemote))
 		fmt.Fprintf(stdout, "%d change(s). Continue (y/N)? ", numChanges)
 
 		if !yesNo(stdin) {
@@ -129,6 +151,14 @@ func main() {
 		_, err = api.CreateDNSRecord(id, r)
 		if err != nil {
 			fmt.Fprintf(stderr, "Failed to add record %+v: %s\n", r, err.Error())
+			exit(1)
+		}
+	}
+
+	for _, r := range updates {
+		err = api.UpdateDNSRecord(id, r.ID, r)
+		if err != nil {
+			fmt.Fprintf(stderr, "Failed to update record %+v: %s\n", r, err.Error())
 			exit(1)
 		}
 	}
