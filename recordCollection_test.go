@@ -10,10 +10,63 @@ import (
 	cloudflare "github.com/cloudflare/cloudflare-go"
 )
 
+func TestClone(t *testing.T) {
+	a := recordCollection{}
+	b := a.Clone()
+	if !reflect.DeepEqual(a, b) {
+		t.Errorf("Clone() failed to clone an empty recordCollection")
+	}
+
+	a = recordCollection{
+		cloudflare.DNSRecord{Type: "A", Name: "a1", Content: "127.0.0.1"},
+		cloudflare.DNSRecord{Type: "A", Name: "a2", Content: "127.0.0.2"},
+		cloudflare.DNSRecord{Type: "A", Name: "a3", Content: "127.0.0.3"},
+		cloudflare.DNSRecord{Type: "A", Name: "a4", Content: "127.0.0.10"},
+		cloudflare.DNSRecord{Type: "A", Name: "a4", Content: "127.0.0.11"},
+		cloudflare.DNSRecord{Type: "A", Name: "a4", Content: "127.0.0.12"},
+		cloudflare.DNSRecord{Type: "A", Name: "a4", Content: "127.0.0.13"},
+		cloudflare.DNSRecord{Type: "AAAA", Name: "a1", Content: "::1"},
+		cloudflare.DNSRecord{Type: "MX", Name: "@", Content: "mail", Priority: 10},
+	}
+	b = a.Clone()
+	if !reflect.DeepEqual(a, b) {
+		t.Errorf("Clone() failed to clone a recordCollection")
+	}
+}
+
+func TestRemove(t *testing.T) {
+	in := recordCollection{
+		cloudflare.DNSRecord{Type: "A", Name: "a1", Content: "127.0.0.1", TTL: 100},
+		cloudflare.DNSRecord{Type: "A", Name: "a2", Content: "127.0.0.2", TTL: 200},
+		cloudflare.DNSRecord{Type: "A", Name: "a3", Content: "127.0.0.3", TTL: 300},
+		cloudflare.DNSRecord{Type: "A", Name: "a4", Content: "127.0.0.4", TTL: 400},
+	}
+
+	a := in.Clone()
+	a.Remove(1)
+	if !reflect.DeepEqual(a, recordCollection{
+		cloudflare.DNSRecord{Type: "A", Name: "a1", Content: "127.0.0.1", TTL: 100},
+		cloudflare.DNSRecord{Type: "A", Name: "a3", Content: "127.0.0.3", TTL: 300},
+		cloudflare.DNSRecord{Type: "A", Name: "a4", Content: "127.0.0.4", TTL: 400},
+	}) {
+		t.Errorf("Remove() did not return expected result")
+	}
+
+	a2 := in.Clone()
+	a2.Remove(1)
+	if !reflect.DeepEqual(a2, recordCollection{
+		cloudflare.DNSRecord{Type: "A", Name: "a1", Content: "127.0.0.1", TTL: 100},
+		cloudflare.DNSRecord{Type: "A", Name: "a3", Content: "127.0.0.3", TTL: 300},
+		cloudflare.DNSRecord{Type: "A", Name: "a4", Content: "127.0.0.4", TTL: 400},
+	}) {
+		t.Errorf("Remove() did not return expected result")
+	}
+}
+
 func TestFindEmpty(t *testing.T) {
 	c := recordCollection{}
 
-	n, r := c.Find(cloudflare.DNSRecord{})
+	n, r := c.Find(cloudflare.DNSRecord{}, FullMatch)
 	if n >= 0 {
 		t.Errorf("Find() returned a non-negative value from an empty collection")
 	}
@@ -23,7 +76,7 @@ func TestFindEmpty(t *testing.T) {
 	}
 }
 
-func TestMatch(t *testing.T) {
+func TestFullMatch(t *testing.T) {
 	cases := []struct {
 		a        cloudflare.DNSRecord
 		b        cloudflare.DNSRecord
@@ -40,7 +93,33 @@ func TestMatch(t *testing.T) {
 	}
 
 	for i, in := range cases {
-		result := match(in.a, in.b)
+		result := FullMatch(in.a, in.b)
+
+		if result != in.expected {
+			t.Errorf("%d: match() Returned unexpected result for %v, %v: %v (expected %v)", i, in.a, in.b, result, in.expected)
+		}
+	}
+}
+
+func TestUpdatable(t *testing.T) {
+	cases := []struct {
+		a        cloudflare.DNSRecord
+		b        cloudflare.DNSRecord
+		expected bool
+	}{
+		{cloudflare.DNSRecord{Type: "A"}, cloudflare.DNSRecord{Type: "A"}, true},
+		{cloudflare.DNSRecord{Type: "A", Name: "a"}, cloudflare.DNSRecord{Type: "A", Name: "a"}, true},
+		{cloudflare.DNSRecord{Type: "A", Name: "a"}, cloudflare.DNSRecord{Type: "A", Name: "ab"}, false},
+		{cloudflare.DNSRecord{Type: "A", Name: "a", TTL: 0}, cloudflare.DNSRecord{Type: "A", Name: "a", TTL: 0}, true},
+		{cloudflare.DNSRecord{Type: "A", Name: "a", TTL: 0}, cloudflare.DNSRecord{Type: "A", Name: "a", TTL: 1}, true},
+		{cloudflare.DNSRecord{Type: "A", Name: "a", Proxied: true}, cloudflare.DNSRecord{Type: "A", Name: "a", Proxied: true}, true},
+		{cloudflare.DNSRecord{Type: "A", Name: "a", Proxied: true}, cloudflare.DNSRecord{Type: "A", Name: "a"}, true},
+		{cloudflare.DNSRecord{Type: "A", Name: "a", TTL: 0}, cloudflare.DNSRecord{Type: "A", Name: "a", TTL: 3600}, true},
+		{cloudflare.DNSRecord{Type: "CNAME", Name: "a", TTL: 0}, cloudflare.DNSRecord{Type: "A", Name: "a", TTL: 3600}, false},
+	}
+
+	for i, in := range cases {
+		result := Updatable(in.a, in.b)
 
 		if result != in.expected {
 			t.Errorf("%d: match() Returned unexpected result for %v, %v: %v (expected %v)", i, in.a, in.b, result, in.expected)
@@ -78,7 +157,7 @@ func TestFind(t *testing.T) {
 	}
 
 	for i, in := range cases {
-		n, r := c.Find(in.needle)
+		n, r := c.Find(in.needle, FullMatch)
 		if n != in.n {
 			t.Errorf("%d: Find() Returned unexpected n: %d (expected %d)", i, n, in.n)
 		}
@@ -89,35 +168,54 @@ func TestFind(t *testing.T) {
 	}
 }
 
-func TestDiff(t *testing.T) {
+func TestDifference(t *testing.T) {
 	empty := recordCollection{}
 	a1 := cloudflare.DNSRecord{Type: "A", Name: "test1", Content: "127.0.0.1"}
 	a2 := cloudflare.DNSRecord{Type: "A", Name: "test1", Content: "127.0.0.2"}
 	aaaa1 := cloudflare.DNSRecord{Type: "AAAA", Name: "test1", Content: "::1"}
 	cases := []struct {
-		a     recordCollection
-		b     recordCollection
-		aOnly recordCollection
-		bOnly recordCollection
+		a        recordCollection
+		b        recordCollection
+		expected recordCollection
 	}{
-		{empty, empty, empty, empty},
-		{empty, recordCollection{a1}, empty, recordCollection{a1}},
-		{recordCollection{a1}, empty, recordCollection{a1}, empty},
-		{empty, recordCollection{aaaa1}, empty, recordCollection{aaaa1}},
-		{recordCollection{aaaa1}, empty, recordCollection{aaaa1}, empty},
-		{recordCollection{aaaa1}, recordCollection{a1}, recordCollection{aaaa1}, recordCollection{a1}},
-		{recordCollection{a1, a2}, recordCollection{a1}, recordCollection{a2}, empty},
-		{recordCollection{a1, a2, a2}, recordCollection{a1}, recordCollection{a2, a2}, empty},
+		{empty, empty, empty},
+		{empty, recordCollection{a1}, empty},
+		{recordCollection{a1}, empty, recordCollection{a1}},
+		{empty, recordCollection{aaaa1}, empty},
+		{recordCollection{aaaa1}, empty, recordCollection{aaaa1}},
+		{recordCollection{aaaa1}, recordCollection{a1}, recordCollection{aaaa1}},
+		{recordCollection{a1, a2}, recordCollection{a1}, recordCollection{a2}},
+		{recordCollection{a1, a2, a2}, recordCollection{a1}, recordCollection{a2, a2}},
 	}
 
 	for i, in := range cases {
-		aOnly, bOnly := in.a.Diff(in.b)
-		if !reflect.DeepEqual(in.aOnly, aOnly) {
-			t.Errorf("%d: aOnly != in.aOnly, Got %+v, expcted %+v", i, aOnly, in.aOnly)
+		result := in.a.Difference(in.b, FullMatch)
+		if !reflect.DeepEqual(in.expected, result) {
+			t.Errorf("%d: aOnly != in.aOnly, Got %+v, expcted %+v", i, result, in.expected)
 		}
+	}
+}
 
-		if !reflect.DeepEqual(in.bOnly, bOnly) {
-			t.Errorf("%d: bOnly != in.bOnly, Got %v, expcted %v", i, bOnly, in.bOnly)
+func TestIntersect(t *testing.T) {
+	empty := recordCollection{}
+	a1 := cloudflare.DNSRecord{Type: "A", Name: "test1", Content: "127.0.0.1"}
+	aaaa1 := cloudflare.DNSRecord{Type: "AAAA", Name: "test1", Content: "::1"}
+	cases := []struct {
+		a        recordCollection
+		b        recordCollection
+		expected recordCollection
+	}{
+		{empty, empty, empty},
+		{empty, recordCollection{a1}, empty},
+		{recordCollection{a1}, empty, empty},
+		{recordCollection{a1}, recordCollection{a1}, recordCollection{a1}},
+		{empty, recordCollection{aaaa1}, empty},
+	}
+
+	for i, in := range cases {
+		result := in.a.Intersect(in.b, FullMatch)
+		if !reflect.DeepEqual(in.expected, result) {
+			t.Errorf("%d: aOnly != in.aOnly, Got %+v, expcted %+v", i, result, in.expected)
 		}
 	}
 }

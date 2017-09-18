@@ -12,10 +12,28 @@ import (
 
 type (
 	recordCollection []cloudflare.DNSRecord
+
+	// FilterFunc is used for finding records in a recordCollection. The
+	// function must return true if there is a hit, false otherwise.
+	FilterFunc func(a cloudflare.DNSRecord, b cloudflare.DNSRecord) bool
 )
 
+// Clone will make a copy of a recordCollection.
+func (c recordCollection) Clone() recordCollection {
+	result := recordCollection{}
+
+	result = append(result, c...)
+
+	return result
+}
+
+// Remove will remove the n'th element of c.
+func (c *recordCollection) Remove(n int) {
+	*c = append((*c)[:n], (*c)[n+1:]...)
+}
+
 // Find will search for needle in a recordCollection.
-func (c recordCollection) Find(needle cloudflare.DNSRecord) (int, *cloudflare.DNSRecord) {
+func (c recordCollection) Find(needle cloudflare.DNSRecord, match FilterFunc) (int, *cloudflare.DNSRecord) {
 	for i, r := range c {
 		if match(r, needle) {
 			return i, &r
@@ -25,28 +43,56 @@ func (c recordCollection) Find(needle cloudflare.DNSRecord) (int, *cloudflare.DN
 	return -1, nil
 }
 
-// Diff will find the differences between two recordCollections.
-func (c recordCollection) Diff(remote recordCollection) (recordCollection, recordCollection) {
-	localOnly := recordCollection{}
-	remoteOnly := recordCollection{}
+// Difference will find all the elements in c not present in remote [c \ remote].
+func (c recordCollection) Difference(remote recordCollection, match FilterFunc) recordCollection {
+	result := recordCollection{}
+	B := remote.Clone()
 
-	for _, l := range c {
-		n, _ := remote.Find(l)
+	for _, r := range c {
+		n, _ := B.Find(r, match)
 
 		if n < 0 {
-			localOnly = append(localOnly, l)
+			result = append(result, r)
+		} else {
+			B.Remove(n)
 		}
 	}
 
-	for _, r := range remote {
-		n, _ := c.Find(r)
+	return result
+}
 
-		if n < 0 {
-			remoteOnly = append(remoteOnly, r)
+// Intersect will find the intersection between c and remote [c ∩ remote] with
+// the caveat that the ID from c will be used in the result - while all other
+// properties will be copied from remote.
+// If multiple record from a collection matches, only one will be present in
+// the returned collection.
+func (c recordCollection) Intersect(remote recordCollection, match FilterFunc) recordCollection {
+	// Clone the inputs - we do this to be able to remove from these
+	// collections when a match is found.
+	A := c.Clone()
+	B := remote.Clone()
+	intersect := recordCollection{}
+
+	for i := 0; i < len(A); i++ {
+		found, hit := B.Find(A[i], match)
+		if found >= 0 {
+			// We do this trickery to keep the ID from the left part.
+			record := *hit
+			record.ID = A[i].ID
+
+			intersect = append(intersect, record)
+
+			// To make sure we're not double-spending we remove the found
+			// record from both inputs.
+			A.Remove(i)
+			B.Remove(found)
+
+			// Rewind the index to compensate for the item we just removed.
+			i--
 		}
 	}
 
-	return localOnly, remoteOnly
+	return intersect
 }
 
 // Fprint will output a textual representation of a recordCollection resembling
@@ -168,9 +214,9 @@ func newRecord(in *dns.Token) (*cloudflare.DNSRecord, error) {
 	return nil, fmt.Errorf("Record type %T is not supported", in.RR)
 }
 
-// match will do matching between two DNS records while ignoring CF specific
+// FullMatch will do matching between two DNS records while ignoring CF specific
 // details.
-func match(a cloudflare.DNSRecord, b cloudflare.DNSRecord) bool {
+func FullMatch(a cloudflare.DNSRecord, b cloudflare.DNSRecord) bool {
 	if a.Type != b.Type {
 		return false
 	}
@@ -200,4 +246,18 @@ func match(a cloudflare.DNSRecord, b cloudflare.DNSRecord) bool {
 	}
 
 	return false
+}
+
+// Updatable will return true if it makes sense to update (instead of
+// add/delete) from a to b or b to a.
+func Updatable(a cloudflare.DNSRecord, b cloudflare.DNSRecord) bool {
+	if a.Type != b.Type {
+		return false
+	}
+
+	if a.Name != b.Name {
+		return false
+	}
+
+	return true
 }

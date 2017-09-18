@@ -64,7 +64,7 @@ func main() {
 		exit(1)
 	}
 
-	zoneName, localRecords, err := parseZone(f)
+	zoneName, fileRecords, err := parseZone(f)
 	if err != nil {
 		fmt.Fprintf(stderr, "Error reading '%s': %s\n", path, err.Error())
 		exit(1)
@@ -87,10 +87,24 @@ func main() {
 		fmt.Fprintf(stderr, "Can't get zone records for '%s': %s\n", id, err.Error())
 		exit(1)
 	}
+	existingRecords := recordCollection(records)
 
-	adds, deletes := localRecords.Diff(records)
+	// Find records only present at cloudflare - and records only present in
+	// the file zone. This will be the basis for the add/delete collections.
+	addCandidates := fileRecords.Difference(existingRecords, FullMatch)
+	deleteCandidates := existingRecords.Difference(fileRecords, FullMatch)
 
-	numChanges := len(adds) + len(deletes)
+	// If we find the intersection between file and existing, we should have
+	// a list of records to update. We use only Updatable here, because that
+	// will give us a collection of records that makes sense to update.
+	updates := deleteCandidates.Intersect(addCandidates, Updatable)
+
+	// The records to be updated can be removed from the add and delete
+	// collections.
+	adds := addCandidates.Difference(updates, Updatable)
+	deletes := deleteCandidates.Difference(updates, Updatable)
+
+	numChanges := len(updates) + len(adds) + len(deletes)
 
 	if numChanges > 0 && !yes {
 		if len(deletes) > 0 {
@@ -105,10 +119,17 @@ func main() {
 			fmt.Printf("\n")
 		}
 
+		if len(updates) > 0 {
+			fmt.Fprintf(stdout, "Records to update:\n")
+			updates.Fprint(stdout)
+			fmt.Printf("\n")
+		}
+
 		fmt.Fprintf(stdout, "Summary:\n")
 		fmt.Fprintf(stdout, "Records to delete: %d\n", len(deletes))
 		fmt.Fprintf(stdout, "Records to add: %d\n", len(adds))
-		fmt.Fprintf(stdout, "Unchanged records: %d\n", len(records)-len(deletes))
+		fmt.Fprintf(stdout, "Records to update: %d\n", len(updates))
+		fmt.Fprintf(stdout, "Unchanged records: %d\n", len(records)-len(deleteCandidates))
 		fmt.Fprintf(stdout, "%d change(s). Continue (y/N)? ", numChanges)
 
 		if !yesNo(stdin) {
@@ -129,6 +150,14 @@ func main() {
 		_, err = api.CreateDNSRecord(id, r)
 		if err != nil {
 			fmt.Fprintf(stderr, "Failed to add record %+v: %s\n", r, err.Error())
+			exit(1)
+		}
+	}
+
+	for _, r := range updates {
+		err = api.UpdateDNSRecord(id, r.ID, r)
+		if err != nil {
+			fmt.Fprintf(stderr, "Failed to update record %+v: %s\n", r, err.Error())
 			exit(1)
 		}
 	}
