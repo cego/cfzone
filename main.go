@@ -20,7 +20,8 @@ var (
 
 	// yes can be set to true to disable the confirmation dialog and sync
 	// without asking the user. Will be set to true by the "-yes" flag.
-	yes = false
+	yes          = false
+	leaveunknown = false
 )
 
 var (
@@ -36,6 +37,7 @@ func parseArguments(args []string) string {
 	flagset := flag.NewFlagSet(args[0], flag.ContinueOnError)
 	flagset.SetOutput(stderr)
 	flagset.BoolVar(&yes, "yes", false, "Don't ask before syncing")
+	flagset.BoolVar(&leaveunknown, "leaveunknown", false, "Don't delete unknown records")
 	err := flagset.Parse(args[1:])
 	if err != nil {
 		flagset.PrintDefaults()
@@ -108,6 +110,12 @@ func main() {
 
 	if numChanges > 0 && !yes {
 		if len(deletes) > 0 {
+			if leaveunknown {
+				// don't delete, -leaveunknown option is used
+				numChanges = numChanges - len(deletes)
+				deletes = deletes[:0]
+				deleteCandidates = deletes[:0]
+			}
 			fmt.Fprintf(stdout, "Records to delete:\n")
 			deletes.Fprint(stdout)
 			fmt.Printf("\n")
@@ -130,6 +138,12 @@ func main() {
 		fmt.Fprintf(stdout, "Records to add: %d\n", len(adds))
 		fmt.Fprintf(stdout, "Records to update: %d\n", len(updates))
 		fmt.Fprintf(stdout, "Unchanged records: %d\n", len(records)-len(deleteCandidates))
+
+		if numChanges == 0 && leaveunknown {
+			fmt.Fprintf(stdout, "\nNote: -leaveunknown option used and this left no changes - exiting.\n")
+			exit(0)
+		}
+
 		fmt.Fprintf(stdout, "%d change(s). Continue (y/N)? ", numChanges)
 
 		if !yesNo(stdin) {
