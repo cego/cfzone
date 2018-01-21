@@ -138,11 +138,6 @@ func main() {
 		fmt.Fprintf(stdout, "Records to update: %d\n", len(updates))
 		fmt.Fprintf(stdout, "Unchanged records: %d\n", len(records)-len(deleteCandidates))
 
-		if numChanges == 0 && leaveUnknown {
-			fmt.Fprintf(stdout, "\nNote: -leaveunknown option used and this left no changes - exiting.\n")
-			exit(0)
-		}
-
 		fmt.Fprintf(stdout, "%d change(s). Continue (y/N)? ", numChanges)
 
 		if !yesNo(stdin) {
