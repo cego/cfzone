@@ -106,16 +106,16 @@ func main() {
 	adds := addCandidates.Difference(updates, Updatable)
 	deletes := deleteCandidates.Difference(updates, Updatable)
 
+	if len(deletes) > 0 && leaveUnknown {
+		fmt.Fprintf(stdout, "%d unknown records left untouched\n", len(deletes))
+		deletes = deletes[:0]
+	}
+
 	numChanges := len(updates) + len(adds) + len(deletes)
 
 	if numChanges > 0 && !yes {
 		if len(deletes) > 0 {
-			if leaveUnknown {
-				// don't delete, -leaveunknown option is used
-				numChanges = numChanges - len(deletes)
-				deletes = deletes[:0]
-				deleteCandidates = deletes[:0]
-			}
+			numChanges = numChanges - len(deletes)
 			fmt.Fprintf(stdout, "Records to delete:\n")
 			deletes.Fprint(stdout)
 			fmt.Printf("\n")
