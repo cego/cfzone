@@ -115,7 +115,6 @@ func main() {
 
 	if numChanges > 0 && !yes {
 		if len(deletes) > 0 {
-			numChanges = numChanges - len(deletes)
 			fmt.Fprintf(stdout, "Records to delete:\n")
 			deletes.Fprint(stdout)
 			fmt.Printf("\n")
