@@ -45,7 +45,7 @@ func parseArguments(args []string) string {
 	}
 
 	if flagset.NArg() < 1 {
-		fmt.Fprintf(stderr, "Too few arguments\n")
+		fmt.Fprintf(stderr, "Too few arguments\nUsage: cfzone <new-zonefile> [-yes] [-leaveunknown]\n")
 		exit(1)
 	}
 
