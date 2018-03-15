@@ -33,7 +33,7 @@ Run cfzone as with the following command:
 `cfzone <zonefile> [-leaveunknown] [-yes]`
 
 Available optional flags:
-| Flag            | Description                                                        |
+| Flag            | Description                                               |
 |-----------------|-----------------------------------------------------------|
 | `-leaveunknown` | Don't delete unknown records                              |
 | `-yes`          |will cause cfzone to continue syncing without confirmation.|
