@@ -30,7 +30,7 @@ cfzone need two environment variables:
 - `CF_API_EMAIL` - Your Cloudflare email address.
 
 Run cfzone as with the following command:
-`cfzone <zonefile> [-leaveunknown] [-yes]`
+`cfzone [-leaveunknown] [-yes] <zonefile>`
 
 Available optional flags:
 
