@@ -2,9 +2,12 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 
@@ -65,6 +68,15 @@ func main() {
 		fmt.Fprintf(stderr, "Error opening '%s': %s\n", path, err.Error())
 		exit(1)
 	}
+
+	hasher := sha256.New()
+	s, err := ioutil.ReadFile(path)
+	hasher.Write(s)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error calculating checksum for '%s': %s\n", path, err.Error())
+		exit(1)
+	}
+	zoneChecksum := hex.EncodeToString(hasher.Sum(nil))
 
 	zoneName, fileRecords, err := parseZone(f)
 	if err != nil {
@@ -133,6 +145,7 @@ func main() {
 		}
 
 		fmt.Fprintf(stdout, "Summary:\n")
+		fmt.Fprintf(stdout, "Zone checksum: %s\n", zoneChecksum)
 		fmt.Fprintf(stdout, "Records to delete: %d\n", len(deletes))
 		fmt.Fprintf(stdout, "Records to add: %d\n", len(adds))
 		fmt.Fprintf(stdout, "Records to update: %d\n", len(updates))
