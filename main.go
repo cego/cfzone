@@ -145,7 +145,7 @@ func main() {
 		}
 
 		fmt.Fprintf(stdout, "Summary:\n")
-		fmt.Fprintf(stdout, "Zone checksum: %s\n", zoneChecksum)
+		fmt.Fprintf(stdout, "SHA256 zone checksum: %s\n", zoneChecksum)
 		fmt.Fprintf(stdout, "Records to delete: %d\n", len(deletes))
 		fmt.Fprintf(stdout, "Records to add: %d\n", len(adds))
 		fmt.Fprintf(stdout, "Records to update: %d\n", len(updates))
