@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"io"
@@ -65,6 +66,14 @@ func main() {
 		fmt.Fprintf(stderr, "Error opening '%s': %s\n", path, err.Error())
 		exit(1)
 	}
+
+	hasher := sha256.New()
+	_, err = io.Copy(hasher, f)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error reading '%s': %s\n", "path", err.Error())
+		exit(1)
+	}
+	f.Seek(0, 0)
 
 	zoneName, fileRecords, err := parseZone(f)
 	if err != nil {
@@ -133,6 +142,7 @@ func main() {
 		}
 
 		fmt.Fprintf(stdout, "Summary:\n")
+		fmt.Fprintf(stdout, "SHA256 zone checksum: %x\n", hasher.Sum(nil))
 		fmt.Fprintf(stdout, "Records to delete: %d\n", len(deletes))
 		fmt.Fprintf(stdout, "Records to add: %d\n", len(adds))
 		fmt.Fprintf(stdout, "Records to update: %d\n", len(updates))
