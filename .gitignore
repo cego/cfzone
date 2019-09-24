@@ -1,1 +1,3 @@
 /cfzone
+# Ignore IDE files
+.idea

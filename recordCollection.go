@@ -10,6 +10,10 @@ import (
 	"github.com/miekg/dns"
 )
 
+
+const cfAutoTTL = 0 // This is the literal TTL in Cloudflare auto-TTL records
+const cfCacheTTL = 1 // This is the literal TTL in Cloudflare CDN records
+
 type (
 	recordCollection []cloudflare.DNSRecord
 
@@ -120,10 +124,17 @@ func (c recordCollection) Fprint(w io.Writer) {
 // parseZone will parse a BIND style zone file and return the zone name and
 // a recordCollection.
 func parseZone(r io.Reader) (string, recordCollection, error) {
+	return parseZoneWithOrigin(r, "")
+}
+
+func parseZoneWithOrigin(r io.Reader, origin string) (string, recordCollection, error) {
+	return parseZoneWithOriginAndTTLs(r, origin, cfAutoTTL, cfCacheTTL)
+}
+func parseZoneWithOriginAndTTLs(r io.Reader, origin string, autoTTL, cacheTTL int) (string, recordCollection, error) {
 	var zoneName string
 	records := recordCollection{}
 
-	for t := range dns.ParseZone(r, "", "") {
+	for t := range dns.ParseZone(r, origin, "") {
 		if t.Error != nil {
 			return "", recordCollection{}, t.Error
 		}
@@ -134,7 +145,7 @@ func parseZone(r io.Reader) (string, recordCollection, error) {
 			zoneName = strings.Trim(soa.Header().Name, ".")
 		}
 
-		r, err := newRecord(t)
+		r, err := newRecord(t, autoTTL, cacheTTL)
 		if err != nil {
 			return "", recordCollection{}, err
 		}
@@ -156,14 +167,19 @@ func parseZone(r io.Reader) (string, recordCollection, error) {
 // If the TTL has a value of 1 Proxied will be set to true in the resulting
 // DNSRecord mimicking Cloudflare internal TTL's.
 // A TTL of 0 will result in "automatic" TTL.
-func newRecord(in *dns.Token) (*cloudflare.DNSRecord, error) {
+func newRecord(in *dns.Token, autoTTL, cacheTTL int) (*cloudflare.DNSRecord, error) {
 	record := &cloudflare.DNSRecord{
 		Name: strings.Trim(in.Header().Name, "."),
 		TTL:  int(in.Header().Ttl),
 	}
 
-	if record.TTL == 1 {
+	if record.TTL == cacheTTL {
 		record.Proxied = true
+		record.TTL = cfCacheTTL
+	} else if record.TTL == autoTTL {
+		record.TTL = cfAutoTTL
+	} else if record.TTL < 1 {
+		record.TTL = 1
 	}
 
 	switch in.RR.(type) {
@@ -204,6 +220,18 @@ func newRecord(in *dns.Token) (*cloudflare.DNSRecord, error) {
 		}
 		record.Type = "TXT"
 		return record, nil
+
+	case *dns.SPF:
+		if(ignoreSpf) {
+			// If the user specifically asked, ignore these records rather than raising an error
+			return nil, nil
+		}
+
+	case *dns.SRV:
+		if(ignoreSrv) {
+			// If the user specifically asked, ignore these records rather than raising an error
+			return nil, nil
+		}
 
 	case *dns.NS, *dns.SOA:
 		// We silently ignore NS and SOA because Cloudflare does not allow
