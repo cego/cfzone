@@ -51,5 +51,5 @@ Available optional flags:
 You'll need a working [Go environment](https://golang.org/doc/install) to build
 cfzone.
 
-`go get github.com/cego/cfzone` should retrieve the source code, build it and
+`go get github.com/third-light/cfzone` should retrieve the source code, build it and
 place the binary in `$GOPATH/bin/cfzone`.
