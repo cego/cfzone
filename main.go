@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"crypto/sha256"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -23,6 +24,11 @@ var (
 	// without asking the user. Will be set to true by the "-yes" flag.
 	yes          = false
 	leaveUnknown = false
+	ignoreSpf    = false
+	ignoreSrv    = false
+	origin       = ""
+	zoneAutoTTL  = 0
+	zoneCacheTTL = 1
 )
 
 var (
@@ -30,31 +36,38 @@ var (
 	apiEmail = os.Getenv("CF_API_EMAIL")
 )
 
-// parseArguments tries to pass the arguments in args. For most uses it would
-// make sense to simple pass os.Args. The function will call exit(1) on any
-// error. It will return the first ńon-flag argument.
-func parseArguments(args []string) string {
+// parseArguments tries to pass the arguments in args.
+// It will return the first ńon-flag argument, and any error encountered
+func parseArguments(args []string) (string, error) {
 	// We do our own flagset to be able to test arguments.
 	flagset := flag.NewFlagSet(args[0], flag.ContinueOnError)
+	flagset.Usage = func() {
+		fmt.Fprintf(flagset.Output(), "Usage of %s [flags] /path/to/zone/file:\n", os.Args[0])
+		flagset.PrintDefaults()
+	}
 	flagset.SetOutput(stderr)
 	flagset.BoolVar(&yes, "yes", false, "Don't ask before syncing")
 	flagset.BoolVar(&leaveUnknown, "leaveunknown", false, "Don't delete unknown records")
+	flagset.BoolVar(&ignoreSpf, "ignorespf", false, "Ignore SPF RR type (Not supported by this tool; use TXT for SPF records)")
+	flagset.BoolVar(&ignoreSrv, "ignoresrv", false, "Ignore SRV RR type (Not supported by this tool)")
+	flagset.StringVar(&origin, "origin", "", "Specify origin to resolve '@' at the top level")
+	flagset.IntVar(&zoneAutoTTL, "autottl", 0, "Specify TTL to interpret as Cloudflare automatic")
+	flagset.IntVar(&zoneCacheTTL, "cachettl", 1, "Specify TTL to interpret as Cloudflare caching")
 	err := flagset.Parse(args[1:])
-	if err != nil {
-		flagset.PrintDefaults()
-		exit(1)
+	if err == nil && flagset.NArg() < 1 {
+		err = errors.New("Zone file must be specified")
+		fmt.Fprintln(flagset.Output(), err)
+		flagset.Usage()
 	}
 
-	if flagset.NArg() < 1 {
-		fmt.Fprintf(stderr, "Too few arguments\nUsage: cfzone <new-zonefile> [-yes] [-leaveunknown]\n")
-		exit(1)
-	}
-
-	return flagset.Arg(0)
+	return flagset.Arg(0), err
 }
 
 func main() {
-	path := parseArguments(os.Args)
+	path, err := parseArguments(os.Args)
+	if err != nil {
+		os.Exit(1)
+	}
 
 	if apiKey == "" || apiEmail == "" {
 		fmt.Fprintf(stderr, "Please set CF_API_KEY and CF_API_EMAIL environment variables\n")
@@ -75,7 +88,7 @@ func main() {
 	}
 	f.Seek(0, 0)
 
-	zoneName, fileRecords, err := parseZone(f)
+	zoneName, fileRecords, err := parseZoneWithOriginAndTTLs(f, origin, zoneAutoTTL, zoneCacheTTL)
 	if err != nil {
 		fmt.Fprintf(stderr, "Error reading '%s': %s\n", path, err.Error())
 		exit(1)
@@ -93,10 +106,20 @@ func main() {
 		exit(1)
 	}
 
-	records, err := api.DNSRecords(id, cloudflare.DNSRecord{})
+	allRecords, err := api.DNSRecords(id, cloudflare.DNSRecord{})
 	if err != nil {
 		fmt.Fprintf(stderr, "Can't get zone records for '%s': %s\n", id, err.Error())
 		exit(1)
+	}
+	var records = make([]cloudflare.DNSRecord, 0, len(allRecords))
+	for _, record := range allRecords {
+		if record.Type == "SRV" && ignoreSrv {
+			continue
+		}
+		if record.Type == "SPF" && ignoreSpf {
+			continue
+		}
+		records = append(records, record)
 	}
 	existingRecords := recordCollection(records)
 
