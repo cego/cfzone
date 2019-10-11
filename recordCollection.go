@@ -216,7 +216,7 @@ func newRecord(in *dns.Token, autoTTL, cacheTTL int) (*cloudflare.DNSRecord, err
 	case *dns.TXT:
 		txt := in.RR.(*dns.TXT)
 		if len(txt.Txt) > 0 {
-			record.Content = txt.Txt[0]
+			record.Content = strings.Join(txt.Txt,"")
 		}
 		record.Type = "TXT"
 		return record, nil
