@@ -134,18 +134,16 @@ func parseZoneWithOriginAndTTLs(r io.Reader, origin string, autoTTL, cacheTTL in
 	var zoneName string
 	records := recordCollection{}
 
-	for t := range dns.ParseZone(r, origin, "") {
-		if t.Error != nil {
-			return "", recordCollection{}, t.Error
-		}
+	p := dns.NewZoneParser(r, "", "")
 
+	for rr, ok := p.Next(); ok; rr, ok = p.Next() {
 		// Search for zonename while we're at it.
-		soa, found := t.RR.(*dns.SOA)
+		soa, found := rr.(*dns.SOA)
 		if found {
 			zoneName = strings.Trim(soa.Header().Name, ".")
 		}
 
-		r, err := newRecord(t, autoTTL, cacheTTL)
+		r, err := newRecord(rr, autoTTL, cacheTTL)
 		if err != nil {
 			return "", recordCollection{}, err
 		}
@@ -153,6 +151,10 @@ func parseZoneWithOriginAndTTLs(r io.Reader, origin string, autoTTL, cacheTTL in
 		if r != nil {
 			records = append(records, *r)
 		}
+	}
+
+	if err := p.Err(); err != nil {
+		return "", recordCollection{}, err
 	}
 
 	if zoneName == "" {
@@ -167,7 +169,7 @@ func parseZoneWithOriginAndTTLs(r io.Reader, origin string, autoTTL, cacheTTL in
 // If the TTL has a value of 1 Proxied will be set to true in the resulting
 // DNSRecord mimicking Cloudflare internal TTL's.
 // A TTL of 0 will result in "automatic" TTL.
-func newRecord(in *dns.Token, autoTTL, cacheTTL int) (*cloudflare.DNSRecord, error) {
+func newRecord(in dns.RR, autoTTL, cacheTTL int) (*cloudflare.DNSRecord, error) {
 	record := &cloudflare.DNSRecord{
 		Name: strings.Trim(in.Header().Name, "."),
 		TTL:  int(in.Header().Ttl),
@@ -182,43 +184,43 @@ func newRecord(in *dns.Token, autoTTL, cacheTTL int) (*cloudflare.DNSRecord, err
 		record.TTL = 1
 	}
 
-	switch in.RR.(type) {
+	switch v := in.(type) {
 	case *dns.A:
-		a := in.RR.(*dns.A)
-		record.Content = a.A.String()
+		record.Content = v.A.String()
 		record.Type = "A"
+
 		return record, nil
 
 	case *dns.AAAA:
-		a := in.RR.(*dns.AAAA)
-		record.Content = a.AAAA.String()
+		record.Content = v.AAAA.String()
 		record.Type = "AAAA"
+
 		return record, nil
 
 	case *dns.CNAME:
-		cname := in.RR.(*dns.CNAME)
-		record.Content = cname.Target
+		record.Content = v.Target
 		record.Type = "CNAME"
 
 		// CloudFlare does not use the "FQDN-dot". We remove it.
 		if strings.HasSuffix(record.Content, ".") {
 			record.Content = record.Content[:len(record.Content)-1]
 		}
+
 		return record, nil
 
 	case *dns.MX:
-		mx := in.RR.(*dns.MX)
-		record.Content = strings.Trim(mx.Mx, ".")
-		record.Priority = int(mx.Preference)
+		record.Content = strings.Trim(v.Mx, ".")
+		record.Priority = int(v.Preference)
 		record.Type = "MX"
+
 		return record, nil
 
 	case *dns.TXT:
-		txt := in.RR.(*dns.TXT)
-		if len(txt.Txt) > 0 {
-			record.Content = strings.Join(txt.Txt,"")
-		}
 		record.Type = "TXT"
+		if len(v.Txt) > 0 {
+			record.Content = strings.Join(v.Txt,"")
+		}
+
 		return record, nil
 
 	case *dns.SPF:
@@ -239,7 +241,7 @@ func newRecord(in *dns.Token, autoTTL, cacheTTL int) (*cloudflare.DNSRecord, err
 		return nil, nil
 	}
 
-	return nil, fmt.Errorf("Record type %T is not supported", in.RR)
+	return nil, fmt.Errorf("record type %T is not supported", in)
 }
 
 // FullMatch will do matching between two DNS records while ignoring CF specific
