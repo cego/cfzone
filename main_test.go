@@ -33,9 +33,10 @@ func expectExit(t *testing.T, code int) {
 }
 
 func TestBrokenFlag(t *testing.T) {
-	defer expectExit(t, 1)
-
-	parseArguments([]string{"./test", "-broken"})
+	_, err := parseArguments([]string{"./test", "-broken"})
+	if err == nil {
+		t.Errorf("parseArguments() did not err on broken arguments")
+	}
 }
 
 func TestParseArguments(t *testing.T) {
@@ -49,7 +50,11 @@ func TestParseArguments(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		result := parseArguments(c.in)
+		result, err := parseArguments(c.in)
+
+		if err != nil {
+			t.Errorf("%d: %s", i, err.Error())
+		}
 
 		if result != c.expected {
 			t.Errorf("%d: parseArguments() did not return expected path for %+v. Got %s, expected %s", i, c.in, result, c.expected)
@@ -68,9 +73,10 @@ func TestMissingKey(t *testing.T) {
 }
 
 func TestMissingArgument(t *testing.T) {
-	defer expectExit(t, 1)
-
-	parseArguments([]string{"./test"})
+	_, err := parseArguments([]string{"./test"})
+	if err == nil {
+		t.Errorf("parseArguments() did not err on missing argument")
+	}
 }
 
 func TestNonexisting(t *testing.T) {
