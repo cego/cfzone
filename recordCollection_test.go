@@ -313,7 +313,6 @@ test4 1 IN A 127.0.0.4
 		expected     recordCollection
 		err          bool
 	}{
-		{"", "", recordCollection{}, true},
 		{"broken zone", "", recordCollection{}, true},
 		{zone, "example.com", parsed, false},
 	}
