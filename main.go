@@ -86,7 +86,12 @@ func main() {
 		fmt.Fprintf(stderr, "Error reading '%s': %s\n", "path", err.Error())
 		exit(1)
 	}
-	f.Seek(0, 0)
+
+	_, err = f.Seek(0, 0)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error seeking '%s': %s\n", path, err.Error())
+		exit(1)
+	}
 
 	zoneName, fileRecords, err := parseZoneWithOriginAndTTLs(f, origin, zoneAutoTTL, zoneCacheTTL)
 	if err != nil {
@@ -209,9 +214,5 @@ func main() {
 func yesNo(r io.Reader) bool {
 	line, _, _ := bufio.NewReader(r).ReadLine()
 
-	if strings.ToLower(string(line)) == "y" {
-		return true
-	}
-
-	return false
+	return strings.ToLower(string(line)) == "y"
 }

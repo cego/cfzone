@@ -10,8 +10,7 @@ import (
 	"github.com/miekg/dns"
 )
 
-
-const cfAutoTTL = 0 // This is the literal TTL in Cloudflare auto-TTL records
+const cfAutoTTL = 0  // This is the literal TTL in Cloudflare auto-TTL records
 const cfCacheTTL = 1 // This is the literal TTL in Cloudflare CDN records
 
 type (
@@ -218,19 +217,19 @@ func newRecord(in dns.RR, autoTTL, cacheTTL int) (*cloudflare.DNSRecord, error) 
 	case *dns.TXT:
 		record.Type = "TXT"
 		if len(v.Txt) > 0 {
-			record.Content = strings.Join(v.Txt,"")
+			record.Content = strings.Join(v.Txt, "")
 		}
 
 		return record, nil
 
 	case *dns.SPF:
-		if(ignoreSpf) {
+		if ignoreSpf {
 			// If the user specifically asked, ignore these records rather than raising an error
 			return nil, nil
 		}
 
 	case *dns.SRV:
-		if(ignoreSrv) {
+		if ignoreSrv {
 			// If the user specifically asked, ignore these records rather than raising an error
 			return nil, nil
 		}

@@ -376,8 +376,6 @@ test2 1800 IN A 127.0.0.2
 		if err == nil {
 			t.Errorf("%d: parseZone() failed to err on broken zone", i)
 		}
-
-		parseZone(r)
 	}
 }
 
