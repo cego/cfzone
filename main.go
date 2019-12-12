@@ -8,9 +8,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/cloudflare/cloudflare-go"
+)
+
+const (
+	// version must be updated when changes affecting cloudflare is made.
+	// This is to protect against undoing a fix or a feature applied to
+	// cfzone using an older version of cfzone.
+	version = 2019121201
 )
 
 var (
@@ -39,6 +47,8 @@ var (
 // parseArguments tries to pass the arguments in args.
 // It will return the first ńon-flag argument, and any error encountered
 func parseArguments(args []string) (string, error) {
+	printVersion := false
+
 	// We do our own flagset to be able to test arguments.
 	flagset := flag.NewFlagSet(args[0], flag.ContinueOnError)
 	flagset.Usage = func() {
@@ -53,7 +63,15 @@ func parseArguments(args []string) (string, error) {
 	flagset.StringVar(&origin, "origin", "", "Specify origin to resolve '@' at the top level")
 	flagset.IntVar(&zoneAutoTTL, "autottl", 0, "Specify TTL to interpret as Cloudflare automatic")
 	flagset.IntVar(&zoneCacheTTL, "cachettl", 1, "Specify TTL to interpret as Cloudflare caching")
+	flagset.BoolVar(&printVersion, "version", false, "Print version")
+
 	err := flagset.Parse(args[1:])
+
+	if printVersion {
+		fmt.Printf("%d\n", version)
+		exit(0)
+	}
+
 	if err == nil && flagset.NArg() < 1 {
 		err = errors.New("Zone file must be specified")
 		fmt.Fprintln(flagset.Output(), err)
@@ -128,6 +146,33 @@ func main() {
 	}
 	existingRecords := recordCollection(records)
 
+	versionRecord := cloudflare.DNSRecord{
+		Name:    "cfzone-version." + zoneName,
+		Content: strconv.Itoa(version),
+		Type:    "TXT",
+		TTL:     600,
+	}
+
+	n, versionRecordFound := existingRecords.Find(versionRecord, Updatable)
+	if versionRecordFound != nil {
+		deployedVersion, _ := strconv.Atoi(versionRecordFound.Content)
+
+		// Check if we risk "downgrading" the cloudflare setup.
+		if deployedVersion > version {
+			fmt.Fprintf(stdout,
+				"Deployed version (%d) is newer than current version (%d). Continue (y/N)? ",
+				deployedVersion,
+				version)
+
+			if !yesNo(stdin) {
+				fmt.Fprintf(stdout, "Aborting...\n")
+				exit(0)
+			}
+		}
+
+		existingRecords.Remove(n)
+	}
+
 	// Find records only present at cloudflare - and records only present in
 	// the file zone. This will be the basis for the add/delete collections.
 	addCandidates := fileRecords.Difference(existingRecords, FullMatch)
@@ -182,6 +227,18 @@ func main() {
 			fmt.Fprintf(stdout, "Aborting...\n")
 			exit(0)
 		}
+	}
+
+	// We sneak this in after informing the user about updates to avoid
+	// polluting the diff and confusing the user.
+	if versionRecordFound != nil {
+		if versionRecordFound.Content != versionRecord.Content {
+			versionRecordFound.Content = versionRecord.Content
+
+			updates = append(updates, *versionRecordFound)
+		}
+	} else {
+		adds = append(addCandidates, versionRecord)
 	}
 
 	for _, r := range deletes {
