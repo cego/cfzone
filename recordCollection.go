@@ -112,7 +112,7 @@ func (c recordCollection) Fprint(w io.Writer) {
 		name := r.Name + "." + strings.Repeat(" ", maxName-len(r.Name))
 
 		proxied := ""
-		if r.Proxied {
+		if r.Proxied != nil && *r.Proxied {
 			proxied = " ; PROXIED"
 		}
 
@@ -133,7 +133,8 @@ func parseZoneWithOriginAndTTLs(r io.Reader, origin string, autoTTL, cacheTTL in
 	var zoneName string
 	records := recordCollection{}
 
-	p := dns.NewZoneParser(r, "", "")
+	p := dns.NewZoneParser(r, origin, "")
+	p.SetIncludeAllowed(true)
 
 	for rr, ok := p.Next(); ok; rr, ok = p.Next() {
 		// Search for zonename while we're at it.
@@ -173,15 +174,17 @@ func newRecord(in dns.RR, autoTTL, cacheTTL int) (*cloudflare.DNSRecord, error) 
 		Name: strings.Trim(in.Header().Name, "."),
 		TTL:  int(in.Header().Ttl),
 	}
+	doProxy := false
 
 	if record.TTL == cacheTTL {
-		record.Proxied = true
+		doProxy = true
 		record.TTL = cfCacheTTL
 	} else if record.TTL == autoTTL {
 		record.TTL = cfAutoTTL
 	} else if record.TTL < 1 {
 		record.TTL = 1
 	}
+	record.Proxied = &doProxy
 
 	switch v := in.(type) {
 	case *dns.A:
@@ -209,7 +212,7 @@ func newRecord(in dns.RR, autoTTL, cacheTTL int) (*cloudflare.DNSRecord, error) 
 
 	case *dns.MX:
 		record.Content = strings.Trim(v.Mx, ".")
-		record.Priority = int(v.Preference)
+		record.Priority = &v.Preference
 		record.Type = "MX"
 
 		return record, nil
@@ -254,7 +257,7 @@ func FullMatch(a cloudflare.DNSRecord, b cloudflare.DNSRecord) bool {
 		return false
 	}
 
-	if a.Proxied != b.Proxied {
+	if a.Proxied != nil && b.Proxied != nil && *a.Proxied != *b.Proxied {
 		return false
 	}
 
@@ -269,7 +272,10 @@ func FullMatch(a cloudflare.DNSRecord, b cloudflare.DNSRecord) bool {
 		}
 
 	case "MX":
-		if a.Content == b.Content && a.Priority == b.Priority {
+		if a.Priority != nil && b.Priority != nil && *a.Priority != *b.Priority {
+			return false
+		}
+		if a.Content == b.Content {
 			return true
 		}
 	}
