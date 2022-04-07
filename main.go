@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"errors"
 	"flag"
@@ -34,6 +35,7 @@ var (
 	leaveUnknown = false
 	ignoreSpf    = false
 	ignoreSrv    = false
+	useToken     = false
 	origin       = ""
 	zoneAutoTTL  = 0
 	zoneCacheTTL = 1
@@ -42,6 +44,7 @@ var (
 var (
 	apiKey   = os.Getenv("CF_API_KEY")
 	apiEmail = os.Getenv("CF_API_EMAIL")
+	apiToken = os.Getenv("CF_API_TOKEN")
 )
 
 // parseArguments tries to pass the arguments in args.
@@ -87,9 +90,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	// If a global key is provided, use it
+	// Otherwise, check for a (scoped) token
 	if apiKey == "" || apiEmail == "" {
-		fmt.Fprintf(stderr, "Please set CF_API_KEY and CF_API_EMAIL environment variables\n")
-		exit(1)
+		if apiToken == "" {
+			fmt.Fprintf(stderr, "Please set CF_API_KEY and CF_API_EMAIL environment variables\n")
+			exit(1)
+		}
+		useToken = true
 	}
 
 	f, err := os.Open(path)
@@ -117,7 +125,12 @@ func main() {
 		exit(1)
 	}
 
-	api, err := cloudflare.New(apiKey, apiEmail)
+	var api *cloudflare.API
+	if useToken {
+		api, err = cloudflare.NewWithAPIToken(apiToken)
+	} else {
+		api, err = cloudflare.New(apiKey, apiEmail)
+	}
 	if err != nil {
 		fmt.Fprintf(stderr, "Error contacting Cloudflare: %s\n", err.Error())
 		exit(1)
@@ -129,7 +142,7 @@ func main() {
 		exit(1)
 	}
 
-	allRecords, err := api.DNSRecords(id, cloudflare.DNSRecord{})
+	allRecords, err := api.DNSRecords(context.Background(), id, cloudflare.DNSRecord{})
 	if err != nil {
 		fmt.Fprintf(stderr, "Can't get zone records for '%s': %s\n", id, err.Error())
 		exit(1)
@@ -242,7 +255,7 @@ func main() {
 	}
 
 	for _, r := range deletes {
-		err = api.DeleteDNSRecord(id, r.ID)
+		err = api.DeleteDNSRecord(context.Background(), id, r.ID)
 		if err != nil {
 			fmt.Fprintf(stderr, "Failed to delete record %+v: %s\n", r, err.Error())
 			exit(1)
@@ -250,7 +263,7 @@ func main() {
 	}
 
 	for _, r := range adds {
-		_, err = api.CreateDNSRecord(id, r)
+		_, err = api.CreateDNSRecord(context.Background(), id, r)
 		if err != nil {
 			fmt.Fprintf(stderr, "Failed to add record %+v: %s\n", r, err.Error())
 			exit(1)
@@ -258,7 +271,7 @@ func main() {
 	}
 
 	for _, r := range updates {
-		err = api.UpdateDNSRecord(id, r.ID, r)
+		err = api.UpdateDNSRecord(context.Background(), id, r.ID, r)
 		if err != nil {
 			fmt.Fprintf(stderr, "Failed to update record %+v: %s\n", r, err.Error())
 			exit(1)

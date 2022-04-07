@@ -26,10 +26,14 @@ Pull requests welcome :-)
 
 ## Running cfzone
 
-cfzone need two environment variables:
+cfzone needs API credentials via environment variables. Either supply both:
 
 - `CF_API_KEY` - Your API key from [Cloudflare](https://support.cloudflare.com/hc/en-us/articles/200167836-Where-do-I-find-my-Cloudflare-API-key-)
 - `CF_API_EMAIL` - Your Cloudflare email address.
+
+to run using a global API key, or supply just:
+
+- `CF_API_TOKEN` - Scoped API token from [Cloudflare](https://developers.cloudflare.com/api/tokens/create/)
 
 Run cfzone as with the following command:
 `cfzone [-leaveunknown] [-yes] <zonefile>`
