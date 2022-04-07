@@ -133,7 +133,7 @@ func parseZoneWithOriginAndTTLs(r io.Reader, origin string, autoTTL, cacheTTL in
 	var zoneName string
 	records := recordCollection{}
 
-	p := dns.NewZoneParser(r, "", "")
+	p := dns.NewZoneParser(r, origin, "")
 
 	for rr, ok := p.Next(); ok; rr, ok = p.Next() {
 		// Search for zonename while we're at it.
