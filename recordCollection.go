@@ -135,7 +135,7 @@ func parseZoneWithOriginAndTTLs(r io.Reader, origin string, autoTTL, cacheTTL in
 
 	p := dns.NewZoneParser(r, origin, "")
 	p.SetIncludeAllowed(true)
-	
+
 	for rr, ok := p.Next(); ok; rr, ok = p.Next() {
 		// Search for zonename while we're at it.
 		soa, found := rr.(*dns.SOA)
@@ -257,7 +257,7 @@ func FullMatch(a cloudflare.DNSRecord, b cloudflare.DNSRecord) bool {
 		return false
 	}
 
-	if a.Proxied != b.Proxied {
+	if a.Proxied != nil && b.Proxied != nil && *a.Proxied != *b.Proxied {
 		return false
 	}
 
@@ -272,7 +272,10 @@ func FullMatch(a cloudflare.DNSRecord, b cloudflare.DNSRecord) bool {
 		}
 
 	case "MX":
-		if a.Content == b.Content && a.Priority == b.Priority {
+		if a.Priority != nil && b.Priority != nil && *a.Priority != *b.Priority {
+			return false
+		}
+		if a.Content == b.Content {
 			return true
 		}
 	}
